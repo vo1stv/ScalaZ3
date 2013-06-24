@@ -137,6 +137,7 @@ public final class Z3Wrapper {
     }
 
     public static native long mkConfig();
+    public static native void openLog(String name);
     public static native void delConfig(long configPtr);
     public static native void setParamValue(long configPtr, String paramID, String paramValue);
     public static native long mkContext(long configPtr);
@@ -483,6 +484,7 @@ public final class Z3Wrapper {
     public static native void solverReset(long contextPtr, long solverPtr);
     public static native int solverCheck(long contextPtr, long solverPtr);
     public static native long solverGetModel(long contextPtr, long solverPtr);
+    public static native long solverGetProof(long contextPtr, long solverPtr);
     public static native void solverIncRef(long contextPtr, long solverPtr);
     public static native void solverDecRef(long contextPtr, long solverPtr);
     public static native long solverGetAssertions(long contextPtr, long solverPtr);
