@@ -33,14 +33,44 @@ public final class Z3Wrapper {
             System.loadLibrary(LIB_NAME);
         } catch (UnsatisfiedLinkError e) {
             // Convert root to: lib....so in Linux, lib....jnilib in MacOS, ....dll in Windows, etc.
-            String name = System.mapLibraryName(LIB_NAME);
-
-            if (withinJar()) {
-                loadFromJar();
-            } else {
+        	boolean found=false;
+        	boolean verbose=false;
+        	
+           	if (withinJar()) {
+                try {
+            		loadFromJar();
+            		found=true;
+                } catch (Exception e2) {
+                    System.out.println("Trouble loading DLLs.  Verbose messages activated." );
+                    verbose=true;
+            	}
+           	}
+           	
+        	if (!found) {
+                String nameScalaZ3 = System.mapLibraryName(LIB_NAME);
+                String nameZ3 = System.mapLibraryName(Z3_LIB_NAME);
                 String curDir = System.getProperty("user.dir");
-                System.load(curDir + LIB_BIN + name );
-            }
+                if(verbose) {
+	                System.out.println(
+	                		"Looking for Libraries " + 
+	                		curDir + LIB_BIN + nameZ3 + 
+	                		" and " + 
+	                		curDir + LIB_BIN + nameScalaZ3
+	                );
+                }
+                try {
+                	System.load(curDir + LIB_BIN + nameZ3 );
+                    if(verbose) {
+                    	System.out.println(nameZ3 + " located.  Verbose messages deactivated." );
+                    }
+                    verbose=false;
+                } catch (Exception e2) {
+                    if(verbose) {
+                    	System.out.println("Using System path for " + nameZ3);
+                    }
+                } 
+                System.load(curDir + LIB_BIN + nameScalaZ3 );
+        	}
         }
     }
 
