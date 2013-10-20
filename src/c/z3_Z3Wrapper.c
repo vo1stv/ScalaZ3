@@ -1778,13 +1778,15 @@ JNIEXPORT jlong JNICALL Java_z3_Z3Wrapper_mkBVMulNoUnderflow (JNIEnv * env, jcla
           Z3_ast ast = asZ3AST(astPtr);
           Z3_ast * from = (Z3_ast*)malloc(numExprs * sizeof(Z3_ast));
           Z3_ast * to = (Z3_ast*)malloc(numExprs * sizeof(Z3_ast));
+		  jlong res;
+
           for(i = 0; i < numExprs; ++i) {
             from[i] = asZ3AST(fromst[i]);
             to[i] = asZ3AST(tost[i]);
 
           }
 
-          jlong res = astToJLong(Z3_substitute(ctx, ast, (unsigned)numExprs, from, to));
+          res = astToJLong(Z3_substitute(ctx, ast, (unsigned)numExprs, from, to));
 
           (*env)->ReleaseLongArrayElements(env, fromPtr, fromst, JNI_ABORT);
           (*env)->ReleaseLongArrayElements(env, toPtr, tost, JNI_ABORT);
@@ -1896,9 +1898,11 @@ JNIEXPORT jlong JNICALL Java_z3_Z3Wrapper_mkBVMulNoUnderflow (JNIEnv * env, jcla
       (JNIEnv * env, jclass cls, jlong contextPtr, jstring name){
         Z3_context ctx = asZ3Context(contextPtr);
         const jbyte * str;
+		Z3_tactic tactic;
+
         str = (*env)->GetStringUTFChars(env, name, NULL);
         if (str == NULL) return JLONG_MY_NULL;
-        Z3_tactic tactic = Z3_mk_tactic(ctx, (const char *)str);
+        tactic = Z3_mk_tactic(ctx, (const char *)str);
         return tacticToJLong(tactic);
       }
 

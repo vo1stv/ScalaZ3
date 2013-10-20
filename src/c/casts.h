@@ -4,6 +4,8 @@
 #include <z3.h>
 #include <jni.h>
 
+#define inline 
+
 #ifdef __cplusplus
 extern "C" {
 #endif
