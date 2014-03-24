@@ -18,7 +18,7 @@ extern "C" {
     }
 
     JNIEXPORT void JNICALL Java_z3_Z3Wrapper_openLog(JNIEnv * env, jclass cls, jstring name) {
-        const char* name_str;
+        const jbyte * name_str;
         name_str = (*env)->GetStringUTFChars(env, name, NULL);
         if (name_str == NULL) return;
 
@@ -26,8 +26,8 @@ extern "C" {
     }
 
     JNIEXPORT void JNICALL Java_z3_Z3Wrapper_setParamValue(JNIEnv * env, jclass cls, jlong configPtr, jstring paramID, jstring paramValue) {
-        const char* str1;
-        const char* str2;
+        const jbyte * str1;
+        const jbyte * str2;
         str1 = (*env)->GetStringUTFChars(env, paramID, NULL);
         if (str1 == NULL) return;
         str2 = (*env)->GetStringUTFChars(env, paramValue, NULL);
@@ -98,8 +98,8 @@ extern "C" {
     }
 
     JNIEXPORT void JNICALL Java_z3_Z3Wrapper_updateParamValue(JNIEnv * env, jclass cls, jlong configPtr, jstring paramID, jstring paramValue) {
-        const char* str1;
-        const char* str2;
+        const jbyte * str1;
+        const jbyte * str2;
         str1 = (*env)->GetStringUTFChars(env, paramID, NULL);
         if (str1 == NULL) return;
         str2 = (*env)->GetStringUTFChars(env, paramValue, NULL);
@@ -114,7 +114,7 @@ extern "C" {
 
     JNIEXPORT jlong JNICALL Java_z3_Z3Wrapper_mkStringSymbol (JNIEnv * env, jclass cls, jlong contextPtr, jstring s) {
         Z3_context cont = asZ3Context(contextPtr);
-        const char* str;
+        const jbyte * str;
         str = (*env)->GetStringUTFChars(env, s, NULL);
         if (str == NULL) return JLONG_MY_NULL;
         return symbolToJLong(Z3_mk_string_symbol(cont, (const char*)str));
@@ -324,7 +324,7 @@ extern "C" {
     }
 
     JNIEXPORT jlong JNICALL Java_z3_Z3Wrapper_mkFreshConst (JNIEnv * env, jclass cls, jlong contextPtr, jstring prefix, jlong sortPtr) {
-        const char* str = (*env)->GetStringUTFChars(env, prefix, NULL);
+        const jbyte * str = (*env)->GetStringUTFChars(env, prefix, NULL);
         jlong result;
 
         if (str == NULL) {
@@ -680,9 +680,10 @@ extern "C" {
 
     JNIEXPORT jlong JNICALL Java_z3_Z3Wrapper_mkNumeral (JNIEnv * env, jclass cls, jlong contextPtr, jstring numeral, jlong sortPtr) {
         const char* str;
+		jlong ast ;
         str = (*env)->GetStringUTFChars(env, numeral, NULL);
         if (str == NULL) return 0;
-        jlong ast = astToJLong(Z3_mk_numeral(asZ3Context(contextPtr), (const char*)str, asZ3Sort(sortPtr)));
+        ast = astToJLong(Z3_mk_numeral(asZ3Context(contextPtr), (const char*)str, asZ3Sort(sortPtr)));
         (*env)->ReleaseStringUTFChars(env, numeral, str);
         return ast;
     }
@@ -1407,7 +1408,7 @@ JNIEXPORT jlong JNICALL Java_z3_Z3Wrapper_mkBVMulNoUnderflow (JNIEnv * env, jcla
 
     JNIEXPORT jstring JNICALL Java_z3_Z3Wrapper_benchmarkToSMTLIBString (JNIEnv * env, jclass cls, jlong contextPtr, jstring nameStr, jstring logicStr, jstring statusStr, jstring attrStr, jint numAss, jlongArray ass, jlong formulaPtr) {
         Z3_context cont = asZ3Context(contextPtr);
-        const char *nameStrBytes, *logicStrBytes, *statusStrBytes, *attrStrBytes;
+        const jbyte *nameStrBytes, *logicStrBytes, *statusStrBytes, *attrStrBytes;
         const char * result;
         Z3_ast * cAss = (Z3_ast*)malloc(numAss * sizeof(Z3_ast*));
         jlong  * jAss = (*env)->GetLongArrayElements(env, ass, NULL);
@@ -1444,7 +1445,7 @@ JNIEXPORT jlong JNICALL Java_z3_Z3Wrapper_mkBVMulNoUnderflow (JNIEnv * env, jcla
     }
 
     JNIEXPORT jlong JNICALL Java_z3_Z3Wrapper_mkTheory (JNIEnv * env, jclass cls, jlong contextPtr, jstring name) {
-        const char * nameStr;
+        const jbyte * nameStr;
         Z3_theory toReturn;
 
         nameStr = (*env)->GetStringUTFChars(env, name, NULL);
@@ -1667,13 +1668,15 @@ JNIEXPORT jlong JNICALL Java_z3_Z3Wrapper_mkBVMulNoUnderflow (JNIEnv * env, jcla
           Z3_ast ast = asZ3AST(astPtr);
           Z3_ast * from = (Z3_ast*)malloc(numExprs * sizeof(Z3_ast));
           Z3_ast * to = (Z3_ast*)malloc(numExprs * sizeof(Z3_ast));
+		  jlong res;
+
           for(i = 0; i < numExprs; ++i) {
             from[i] = asZ3AST(fromst[i]);
             to[i] = asZ3AST(tost[i]);
 
           }
 
-          jlong res = astToJLong(Z3_substitute(ctx, ast, (unsigned)numExprs, from, to));
+          res = astToJLong(Z3_substitute(ctx, ast, (unsigned)numExprs, from, to));
 
           (*env)->ReleaseLongArrayElements(env, fromPtr, fromst, JNI_ABORT);
           (*env)->ReleaseLongArrayElements(env, toPtr, tost, JNI_ABORT);
@@ -1784,10 +1787,12 @@ JNIEXPORT jlong JNICALL Java_z3_Z3Wrapper_mkBVMulNoUnderflow (JNIEnv * env, jcla
     JNIEXPORT jlong JNICALL Java_z3_Z3Wrapper_mkTactic
       (JNIEnv * env, jclass cls, jlong contextPtr, jstring name){
         Z3_context ctx = asZ3Context(contextPtr);
-        const char * str;
+        const jbyte * str;
+		Z3_tactic tactic;
+
         str = (*env)->GetStringUTFChars(env, name, NULL);
         if (str == NULL) return JLONG_MY_NULL;
-        Z3_tactic tactic = Z3_mk_tactic(ctx, (const char *)str);
+        tactic = Z3_mk_tactic(ctx, (const char *)str);
         return tacticToJLong(tactic);
       }
 
