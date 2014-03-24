@@ -7,17 +7,17 @@ sealed class Z3Sort private[z3](val ptr: Long, val context: Z3Context) extends Z
     that != null && that.isInstanceOf[Z3Sort] && context.isEqSort(this, that.asInstanceOf[Z3Sort])
   }
 
+  private val hc : Int = ptr.hashCode()
+  override def hashCode : Int = hc
+
   override def toString : String = context.sortToString(this)
 
   lazy val isBoolSort : Boolean = context.isEqSort(this, context.mkBoolSort)
   lazy val isIntSort : Boolean = context.isEqSort(this, context.mkIntSort)
   lazy val isIntSetSort : Boolean = context.isEqSort(this, context.mkSetSort(context.mkIntSort))
+  lazy val isRealSort : Boolean = context.isEqSort(this, context.mkRealSort)
 
   locally {
-    context.astQueue.incRef(this)
-  }
-
-  override def finalize() {
-    context.astQueue.decRef(this)
+    context.astQueue.track(this)
   }
 }

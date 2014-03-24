@@ -10,14 +10,23 @@ import java.io.FileOutputStream;
 import java.util.Calendar;
 import java.text.SimpleDateFormat;
 import java.util.HashMap;
+import java.util.Vector;
 import java.lang.ref.WeakReference;
+import java.lang.reflect.Field;
+import java.util.Arrays;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipEntry;
+import java.security.CodeSource;
+import java.net.URL;
 
 /** This class contains all the native functions. It should be accessed
  * mostly through the other classes, though. */
 public final class Z3Wrapper {
     // related to the path in the jar file
-	private static final String LIB_SEPARATOR = "/";
-    private static final String LIB_BIN = LIB_SEPARATOR + "lib-bin" + LIB_SEPARATOR;
+    private static final String DS = java.io.File.separator;
+    private static final String PS = java.io.File.pathSeparator;
+
+    private static final String LIB_BIN = DS + "lib-bin" + DS;
     // the root name of the library file. lib....so in Linux, lib....jnilib in MacOS, ....dll in Windows, etc.
     private static final String LIB_NAME = "scalaz3";
     private static final String Z3_LIB_NAME = "z3";
@@ -26,51 +35,21 @@ public final class Z3Wrapper {
 
     private static final String versionString = LibraryChecksum.value;
 
+    private static final String isDebug = System.getProperty("scalaz3.debug.load");
+
     // this is just to force class loading, and therefore library loading.
     static {
-        try {
-            // System.out.println("Looking for Library " + LIB_NAME + " in System path" );
-            System.loadLibrary(LIB_NAME);
-        } catch (UnsatisfiedLinkError e) {
-            // Convert root to: lib....so in Linux, lib....jnilib in MacOS, ....dll in Windows, etc.
-        	boolean found=false;
-        	boolean verbose=false;
-        	
-           	if (withinJar()) {
-                try {
-            		loadFromJar();
-            		found=true;
-                } catch (Exception e2) {
-                    System.out.println("Trouble loading DLLs.  Verbose messages activated." );
-                    verbose=true;
-            	}
-           	}
-           	
-        	if (!found) {
-                String nameScalaZ3 = System.mapLibraryName(LIB_NAME);
-                String nameZ3 = System.mapLibraryName(Z3_LIB_NAME);
-                String curDir = System.getProperty("user.dir");
-                if(verbose) {
-	                System.out.println(
-	                		"Looking for Libraries " + 
-	                		curDir + LIB_BIN + nameZ3 + 
-	                		" and " + 
-	                		curDir + LIB_BIN + nameScalaZ3
-	                );
-                }
-                try {
-                	System.load(curDir + LIB_BIN + nameZ3 );
-                    if(verbose) {
-                    	System.out.println(nameZ3 + " located.  Verbose messages deactivated." );
-                    }
-                    verbose=false;
-                } catch (Exception e2) {
-                    if(verbose) {
-                    	System.out.println("Using System path for " + nameZ3);
-                    }
-                } 
-                System.load(curDir + LIB_BIN + nameScalaZ3 );
-        	}
+      if (!withinJar()) {
+        System.err.println("It seems you are not running ScalaZ3 from its JAR");
+        System.exit(1);
+      }
+
+      loadFromJar();
+    }
+
+    private static void debug(String msg) {
+        if (isDebug != null) {
+          System.out.println(msg);
         }
     }
 
@@ -95,47 +74,69 @@ public final class Z3Wrapper {
 
     private static void loadFromJar() {
         String path = "SCALAZ3_" + versionString;
-        loadLib(path, Z3_LIB_NAME, true);
-        loadLib(path, LIB_NAME, false);
+        File libDir  = new File(System.getProperty("java.io.tmpdir") + DS + path + LIB_BIN);
+
+        String libRealName   = System.mapLibraryName(LIB_NAME);
+        String z3LibRealName = System.mapLibraryName(Z3_LIB_NAME);
+
+        try {
+          if (!libDir.isDirectory() || !libDir.canRead()) {
+            libDir.mkdirs();
+            extractFromJar(libDir);
+          }
+
+          addLibraryPath(libDir.getAbsolutePath());
+
+          debug("Loading "+LIB_NAME);
+          System.loadLibrary(LIB_NAME);
+        } catch (Exception e) {
+          System.err.println(e.getMessage());
+          e.printStackTrace();
+        }
     }
 
-    private static void loadLib(String path, String name, boolean optional) {
-        name = System.mapLibraryName(name);
-        String completeFileName = LIB_BIN + name;
-        File fileOut = new File(System.getProperty("java.io.tmpdir") + "/" + path + completeFileName);
-        //System.out.println("I'll be looking for the library as: " + fileOut);
+    public static void addLibraryPath(String pathToAdd) throws Exception {
+        System.setProperty("java.library.path", pathToAdd + PS + System.getProperty("java.library.path"));
 
-        if(fileOut.isFile() && fileOut.canRead()) {
-            // Library has been copied in the past, we can just load it from there.
-            //System.out.println("Looks like I found it !");
-            System.load(fileOut.toString());
-        } else {
-            // Couldn't find the library, so we can copy before we can load it.
-            try {
-                //System.out.println("Oh no, I have to extract it from the jar file !");
-                //System.out.println("Looking for " + completeFileName + " in the jar file...");
-                InputStream in = Z3Wrapper.class.getResourceAsStream(completeFileName);
-                if (in==null && optional)
-                    return; // we ignore this
-                if (in==null)
-                    throw new java.io.FileNotFoundException("Could not find " + completeFileName);
+        // this forces JVM to reload "java.library.path" property
+        Field fieldSysPath = ClassLoader.class.getDeclaredField( "sys_paths" );
+        fieldSysPath.setAccessible( true );
+        fieldSysPath.set( null, null );
+    }
 
-                fileOut.getParentFile().mkdirs();
-                fileOut.createNewFile();
-                OutputStream out = new FileOutputStream(fileOut);
-                byte buf[] = new byte[4096];
-                int len;
-                while((len = in.read(buf)) > 0) {
-                    out.write(buf, 0, len);
+
+    private static void extractFromJar(File toDir) throws Exception {
+        CodeSource src = Z3Wrapper.class.getProtectionDomain().getCodeSource();
+        if (src != null) {
+            URL jar = src.getLocation();
+            ZipInputStream zip = new ZipInputStream(jar.openStream());
+            while(true) {
+                ZipEntry e = zip.getNextEntry();
+                if (e == null) break;
+
+                String path = e.getName();
+
+                if (path.startsWith("lib-bin/") && !e.isDirectory()) {
+
+                    String name = new File(path).getName();
+
+                    debug("Extracting "+path+" from jar to "+name+ "...");
+
+                    File to = new File(toDir.getAbsolutePath() + DS + name);
+
+                    InputStream in   = Z3Wrapper.class.getResourceAsStream("/"+path);
+                    OutputStream out = new FileOutputStream(to);
+                    byte buf[] = new byte[4096];
+                    int len;
+                    while((len = in.read(buf)) > 0) {
+                        out.write(buf, 0, len);
+                    }
+                    out.close();
+                    in.close();
                 }
-                out.close();
-                in.close();
-                System.load(fileOut.toString());
-            } catch (Exception e) {
-                System.err.println(e.getMessage());
-                e.printStackTrace();
             }
         }
+
     }
 
     /** Placeholder class to ease JNI interaction. */
@@ -225,7 +226,8 @@ public final class Z3Wrapper {
     public static native long mkDiv(long contextPtr, long astPtr1, long astPtr2); 
     public static native long mkDiv2(long contextPtr, long astPtr1, long astPtr2); 
     public static native long mkMod(long contextPtr, long astPtr1, long astPtr2); 
-    public static native long mkRem(long contextPtr, long astPtr1, long astPtr2); 
+    public static native long mkRem(long contextPtr, long astPtr1, long astPtr2);
+    public static native long mkPower(long contextPtr, long astPtr1, long astPtr2);
     public static native long mkLT(long contextPtr, long astPtr1, long astPtr2);
     public static native long mkLE(long contextPtr, long astPtr1, long astPtr2);
     public static native long mkGT(long contextPtr, long astPtr1, long astPtr2);
@@ -257,6 +259,7 @@ public final class Z3Wrapper {
     // ...
     public static native long mkInt(long contextPtr, int v, long sortPtr);
     public static native long mkReal(long contextPtr, int num, int den);
+    public static native long mkNumeral(long contextPtr, String numeral, long sortPtr);
     // ...
     public static native long mkPattern(long contextPtr, int numPatterns, long[] terms);
     public static native long mkBound(long contextPtr, int index, long sortPtr);
@@ -391,6 +394,11 @@ public final class Z3Wrapper {
     public static native long getRange(long contextPtr, long funcDeclPtr);
     // ...
     public static native boolean getNumeralInt(long contextPtr, long astPtr, IntPtr i);
+    public static native String getNumeralString(long contextPtr, long astPtr);
+    public static native long getNumerator(long contextPtr, long astPtr);
+    public static native long getDenominator(long contextPtr, long astPtr);
+    public static native boolean isAlgebraicNumber(long contextPtr, long astPtr);
+
     // ...
     public static native int getBoolValue(long contextPtr, long astPtr);
 
