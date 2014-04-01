@@ -54,6 +54,10 @@ object ScalaZ3build extends Build {
     file("z3") / z3Dir / libString
   }
 
+  lazy val z3DefPath = {
+    file("Artemis") / "contrib" / "Z3" / "dll"
+  }
+
   def exec(cmd: String, s: TaskStreams) {
     s.log.info("$ "+cmd)
     cmd ! s.log
@@ -151,6 +155,9 @@ object ScalaZ3build extends Build {
              cFiles.getPaths.mkString(" "), s)
 
       } else if (isWindows) {
+        exec("dlltool " + 	" -D " + (z3LibPath / "libz3.dll").absolutePath +  
+				" -d " + (z3DefPath / "z3.def").absolutePath  + 
+				" -l " + (z3LibPath / "libz3.lib").absolutePath  , s );
         exec("gcc -shared -o " + libBinFilePath.absolutePath + " " +
              "-D_JNI_IMPLEMENTATION_ -Wl,--kill-at " +
              "-D__int64=\"long long\" " +
@@ -159,7 +166,7 @@ object ScalaZ3build extends Build {
              "-I " + "\"" + z3IncludePath.absolutePath + "\" " +
              "-Wreturn-type " +
              cFiles.getPaths.mkString(" ") +
-             " " + z3BinFilePath.absolutePath + "\" ", s)
+             " " + (z3LibPath / "libz3.lib").absolutePath + "\" ", s)
       } else if (isMac) {
         val frameworkPath = "/System/Library/Frameworks/JavaVM.framework/Versions/Current/Headers"
 
